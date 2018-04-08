@@ -1,0 +1,15 @@
+{
+  "name": "akashacms-dlassets",
+  "version": "0.1.0",
+  "description": "Automatically download assets referenced in links, images, etc",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "David Herron <david@davidherron.com>",
+  "license": "ISC",
+  "dependencies": {
+    "fetch": ">=1.1.0",
+    "fs-extra": ">=5.0.0"
+  }
+}
