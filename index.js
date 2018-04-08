@@ -47,7 +47,7 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 
 module.exports.mahabhuta = new mahabhuta.MahafuncArray(pluginName, {});
 
-async function downloadAsset(metadata, href) {
+async function downloadAsset(metadata, href, uHref) {
     // Set up the path for the image.
     // We'll write this path into the <img> tag.
     // We'll store the file into the corresponding file on-disk.
@@ -60,13 +60,14 @@ async function downloadAsset(metadata, href) {
     // known to be dangerous, using this rewriting technique.
     var dlPath = path.join('/___dlassets',
         uHref.host ? uHref.host : "unknown-host",
-        res.response.request.uri.path
-                .replace('%', '__'));
+        uHref.path.replace('%', '__'));
     var pathWriteTo = path.join(metadata.config.renderDestination, dlPath);
+
+    await fs.ensureDir(path.dirname(pathWriteTo));
 
     await new Promise((resolve, reject) => {
         out = fs.createWriteStream(pathWriteTo);
-        new FetchStream(src).pipe(out);
+        new FetchStream(href).pipe(out);
         out.on('error', err => {
             try { out.close(); } catch (e) {}
             reject(err);
@@ -83,8 +84,12 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
         const src   = $img.attr('src');
         if (!src) return "ok";
         const uHref = url.parse(src, true, true);
+        if (uHref.host && uHref.host === 'www.google.com' && uHref.path.startsWith('/s2/favicons')) {
+            // Special case, do not download favicons from Google's favicon service
+            return "ok";
+        }
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref);
             $img.attr('src', dlPath);
             $img.attr('data-orig-src', src);
         }
@@ -100,9 +105,9 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
         const href   = $link.attr('href');
         if (!href) return "ok";
         if (type !== 'text/css') return "ok";
-        const uHref = url.parse(src, true, true);
+        const uHref = url.parse(href, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref);
             $link.attr('href', dlPath);
             $link.attr('data-orig-href', href);
         }
@@ -113,13 +118,13 @@ module.exports.mahabhuta.addMahafunc(new ExternalStylesheetDownloader());
 class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
     get selector() { return 'html head script'; }
     async process($, $script, metadata, dirty) {
-        const src   = $img.attr('src');
+        const src   = $script.attr('src');
         if (!src) return "ok";
         const uHref = url.parse(src, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src);
-            $img.attr('src', dlPath);
-            $img.attr('data-orig-src', src);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref);
+            $script.attr('src', dlPath);
+            $script.attr('data-orig-src', src);
         }
         return "ok";
     }
