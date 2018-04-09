@@ -70,6 +70,7 @@ async function downloadAsset(metadata, href, uHref) {
         new FetchStream(href).pipe(out);
         out.on('error', err => {
             try { out.close(); } catch (e) {}
+            console.error(`downloadAsset ERROR on ${href} ${err.stack}`);
             reject(err);
         });
         out.on('finish', () => { resolve(); });
