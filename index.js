@@ -68,6 +68,7 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     if (!uHref.protocol) {
         uHref.protocol = 'http';
         href = uHref.href;
+        console.log(`downloadAsset NO PROTOCOL change href to ${href}`);
     }
 
     await fs.ensureDir(path.dirname(pathWriteTo));
@@ -84,7 +85,10 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     }); */
 
     var res = await new Promise((resolve, reject) => {
-        request({ url: href, encoding: null }, (error, response, body) => {
+        request({ 
+            url: href,
+            encoding: outputMode === 'binary' ? null : 'utf8'
+        }, (error, response, body) => {
             if (error) reject(error);
             else resolve({response, body});
         });
