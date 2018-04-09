@@ -21,8 +21,9 @@
 const path     = require('path');
 const util     = require('util');
 const url      = require('url');
-const FetchStream = require("fetch").FetchStream;
-const fs = require("fs-extra");
+const got      = require('got');
+// const FetchStream = require("fetch").FetchStream;
+const fs       = require("fs-extra");
 const akasha   = require('akasharender');
 const mahabhuta = akasha.mahabhuta;
 
@@ -65,9 +66,20 @@ async function downloadAsset(metadata, href, uHref) {
 
     await fs.ensureDir(path.dirname(pathWriteTo));
 
-    await new Promise((resolve, reject) => {
+    /* await new Promise((resolve, reject) => {
         out = fs.createWriteStream(pathWriteTo);
         new FetchStream(href).pipe(out);
+        out.on('error', err => {
+            try { out.close(); } catch (e) {}
+            console.error(`downloadAsset ERROR on ${href} ${err.stack}`);
+            reject(err);
+        });
+        out.on('finish', () => { resolve(); });
+    }); */
+
+    out = fs.createWriteStream(pathWriteTo);
+    got.stream(href).pipe(out);
+    await new Promise((resolve, reject) => {
         out.on('error', err => {
             try { out.close(); } catch (e) {}
             console.error(`downloadAsset ERROR on ${href} ${err.stack}`);
