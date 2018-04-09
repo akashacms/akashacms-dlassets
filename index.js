@@ -48,7 +48,7 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 
 module.exports.mahabhuta = new mahabhuta.MahafuncArray(pluginName, {});
 
-async function downloadAsset(metadata, href, uHref) {
+async function downloadAsset(metadata, href, uHref, outputMode) {
     // Set up the path for the image.
     // We'll write this path into the <img> tag.
     // We'll store the file into the corresponding file on-disk.
@@ -77,7 +77,10 @@ async function downloadAsset(metadata, href, uHref) {
         out.on('finish', () => { resolve(); });
     }); */
 
-    out = fs.createWriteStream(pathWriteTo);
+    const response = await got(href);
+    await fs.writeFile(pathWriteTo, response.body, outputMode);
+
+    /* out = fs.createWriteStream(pathWriteTo);
     got.stream(href).pipe(out);
     await new Promise((resolve, reject) => {
         out.on('error', err => {
@@ -86,7 +89,7 @@ async function downloadAsset(metadata, href, uHref) {
             reject(err);
         });
         out.on('finish', () => { resolve(); });
-    });
+    }); */
 
     return { dlPath, pathWriteTo };
 }
@@ -102,7 +105,7 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
             return "ok";
         }
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'binary');
             $img.attr('src', dlPath);
             $img.attr('data-orig-src', src);
         }
@@ -120,7 +123,7 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
         if (type !== 'text/css') return "ok";
         const uHref = url.parse(href, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref, 'utf8');
             $link.attr('href', dlPath);
             $link.attr('data-orig-href', href);
         }
@@ -135,7 +138,7 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
         if (!src) return "ok";
         const uHref = url.parse(src, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref);
+            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'utf8');
             $script.attr('src', dlPath);
             $script.attr('data-orig-src', src);
         }
