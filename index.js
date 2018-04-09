@@ -21,7 +21,8 @@
 const path     = require('path');
 const util     = require('util');
 const url      = require('url');
-const got      = require('got');
+const request  = require('request');
+// const got      = require('got');
 // const FetchStream = require("fetch").FetchStream;
 const fs       = require("fs-extra");
 const akasha   = require('akasharender');
@@ -77,8 +78,15 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
         out.on('finish', () => { resolve(); });
     }); */
 
-    const response = await got(href);
-    await fs.writeFile(pathWriteTo, response.body, outputMode);
+    var res = await new Promise((resolve, reject) => {
+        request({ url: href, encoding: null }, (error, response, body) => {
+            if (error) reject(error);
+            else resolve({response, body});
+        });
+    });
+
+    // const res = await got(href);
+    await fs.writeFile(pathWriteTo, res.body, outputMode);
 
     /* out = fs.createWriteStream(pathWriteTo);
     got.stream(href).pipe(out);

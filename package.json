@@ -9,7 +9,7 @@
   "author": "David Herron <david@davidherron.com>",
   "license": "ISC",
   "dependencies": {
-    "got": ">=8.3.0",
+    "request": ">=2.85.0",
     "fs-extra": ">=5.0.0"
   }
 }
