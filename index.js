@@ -68,7 +68,7 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     if (!uHref.protocol) {
         uHref.protocol = 'http';
         href = url.format(uHref);
-        console.log(`downloadAsset NO PROTOCOL change href to ${href} ${util.inspect(uHref)}`);
+        // console.log(`downloadAsset NO PROTOCOL change href to ${href} ${util.inspect(uHref)}`);
     }
 
     await fs.ensureDir(path.dirname(pathWriteTo));

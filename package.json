@@ -1,6 +1,6 @@
 {
   "name": "akashacms-dlassets",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Automatically download assets referenced in links, images, etc",
   "main": "index.js",
   "scripts": {
