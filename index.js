@@ -65,6 +65,11 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
         uHref.path.replace('%', '__'));
     var pathWriteTo = path.join(metadata.config.renderDestination, dlPath);
 
+    if (!uHref.protocol) {
+        uHref.protocol = 'http';
+        href = uHref.href;
+    }
+
     await fs.ensureDir(path.dirname(pathWriteTo));
 
     /* await new Promise((resolve, reject) => {
