@@ -122,9 +122,13 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
             return "ok";
         }
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'binary');
-            $img.attr('src', dlPath);
-            $img.attr('data-orig-src', src);
+            try {
+                const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'binary');
+                $img.attr('src', dlPath);
+                $img.attr('data-orig-src', src);
+            } catch (e) {
+                console.log(`IGNORE ERROR akashacms-dlassets ExternalImageDownloader for URL ${src}: ${e.stack}`);
+            }
         }
         return "ok";
     }
@@ -140,9 +144,13 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
         if (type !== 'text/css') return "ok";
         const uHref = url.parse(href, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref, 'utf8');
-            $link.attr('href', dlPath);
-            $link.attr('data-orig-href', href);
+            try {
+                const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref, 'utf8');
+                $link.attr('href', dlPath);
+                $link.attr('data-orig-href', href);
+            } catch (e) {
+                console.log(`IGNORE ERROR akashacms-dlassets ExternalStylesheetDownloader for URL ${href}: ${e.stack}`);
+            }
         }
     }
 }
@@ -155,9 +163,13 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
         if (!src) return "ok";
         const uHref = url.parse(src, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
-            const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'utf8');
-            $script.attr('src', dlPath);
-            $script.attr('data-orig-src', src);
+            try {
+                const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'utf8');
+                $script.attr('src', dlPath);
+                $script.attr('data-orig-src', src);
+            } catch (e) {
+                console.log(`IGNORE ERROR akashacms-dlassets ExternalJavaScriptDownloader for URL ${src}: ${e.stack}`);
+            }
         }
         return "ok";
     }
