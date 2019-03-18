@@ -1,8 +1,8 @@
 /**
  *
- * Copyright 2018 David Herron
+ * Copyright 2018, 2019 David Herron
  *
- * This file is part of AkashaCMS-embeddables (http://akashacms.com/).
+ * This file is part of AkashaCMS-dlassets (http://akashacms.com/).
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -28,9 +28,6 @@ const fs       = require("fs-extra");
 const akasha   = require('akasharender');
 const mahabhuta = akasha.mahabhuta;
 
-const log     = require('debug')('akasha:dlassets-plugin');
-const error   = require('debug')('akasha:error-dlassets-plugin');
-
 const pluginName = "akashacms-dlassets";
 
 
@@ -39,8 +36,10 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 		super(pluginName);
 	}
 
-    configure(config) {
+    configure(config, options) {
         this._config = config;
+        this.options = !options ? {} : options;
+        console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
         // config.addPartialsDir(path.join(__dirname, 'partials'));
         // config.addAssetsDir(path.join(__dirname, 'assets'));
         config.addMahabhuta(module.exports.mahabhuta);
@@ -49,7 +48,17 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 
 module.exports.mahabhuta = new mahabhuta.MahafuncArray(pluginName, {});
 
+const hrefsDownloaded = new Map();
+
 async function downloadAsset(metadata, href, uHref, outputMode) {
+
+    if (hrefsDownloaded.has(href)) {
+        // console.log(`downloadAsset cache-hit ${href}`);
+        return hrefsDownloaded.get(href);
+    }
+
+    const thisPlugin = metadata.config.plugin(pluginName);
+
     // Set up the path for the image.
     // We'll write this path into the <img> tag.
     // We'll store the file into the corresponding file on-disk.
@@ -60,10 +69,37 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     // of a URL.  Cheerio doesn't do the right thing to encode this
     // string correctly.  What we'll do instead is hide characters that are
     // known to be dangerous, using this rewriting technique.
-    var dlPath = path.join('/___dlassets',
-        uHref.host ? uHref.host : "unknown-host",
+    var dlPath = path.join('___dlassets',
+        // Obfuscate the host name a bit
+        uHref.host ? uHref.host.replace('.', '_').replace('.', '_') : "unknown-host",
         uHref.path.replace('%', '__'));
-    var pathWriteTo = path.join(metadata.config.renderDestination, dlPath);
+
+    let pathWriteTo;
+    let pathRenderTo;
+
+    if (thisPlugin.options && thisPlugin.options.cachedir) {
+        pathWriteTo = path.join(thisPlugin.options.cachedir, dlPath);
+        pathRenderTo = path.join(metadata.config.renderDestination, dlPath);
+        // console.log(`downloadAsset cachedir ${thisPlugin.options.cachedir} pathWriteTo ${pathWriteTo} pathRenderTo ${pathRenderTo}`);
+        if (await fs.pathExists(pathWriteTo)) {
+            let stats = await fs.stat(pathWriteTo);
+            let age = (new Date() - stats.mtime) / 1000;
+            let seven_days = (7 * 24 * 60 * 60);
+            if (age < seven_days) { // younger than 7 days
+                let ret = { dlPath, pathRenderTo };
+                hrefsDownloaded.set(href, ret);
+                // console.log(`downloadAsset found ${dlPath} => ${pathRenderTo}`);
+                return ret;
+            } /* else {
+                console.log(`downloadAsset age ${dlPath} => ${pathWriteTo} too old ${age} seven_days ${seven_days}`);
+            } */
+        }
+    } else {
+        pathWriteTo = pathRenderTo = path.join(metadata.config.renderDestination, dlPath);
+        // console.log(`downloadAsset NO cachedir pathWriteTo ${pathWriteTo}`);
+    }
+
+    // var pathWriteTo = path.join(metadata.config.renderDestination, dlPath);
 
     if (!uHref.protocol) {
         uHref.protocol = 'http';
@@ -72,17 +108,6 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     }
 
     await fs.ensureDir(path.dirname(pathWriteTo));
-
-    /* await new Promise((resolve, reject) => {
-        out = fs.createWriteStream(pathWriteTo);
-        new FetchStream(href).pipe(out);
-        out.on('error', err => {
-            try { out.close(); } catch (e) {}
-            console.error(`downloadAsset ERROR on ${href} ${err.stack}`);
-            reject(err);
-        });
-        out.on('finish', () => { resolve(); });
-    }); */
 
     var res = await new Promise((resolve, reject) => {
         request({ 
@@ -94,21 +119,17 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
         });
     });
 
-    // const res = await got(href);
+    // console.log(`downloadAsset writeFile ${dlPath} => ${pathWriteTo}`);
     await fs.writeFile(pathWriteTo, res.body, outputMode);
+    if (pathWriteTo !== pathRenderTo) {
+        await fs.ensureDir(path.dirname(pathRenderTo));
+        // console.log(`downloadAsset copy ${dlPath} => ${pathRenderTo}`);
+        await fs.copy(pathWriteTo, pathRenderTo);
+    }
 
-    /* out = fs.createWriteStream(pathWriteTo);
-    got.stream(href).pipe(out);
-    await new Promise((resolve, reject) => {
-        out.on('error', err => {
-            try { out.close(); } catch (e) {}
-            console.error(`downloadAsset ERROR on ${href} ${err.stack}`);
-            reject(err);
-        });
-        out.on('finish', () => { resolve(); });
-    }); */
-
-    return { dlPath, pathWriteTo };
+    let ret = { dlPath, pathRenderTo };
+    hrefsDownloaded.set(href, ret);
+    return ret;
 }
 
 class ExternalImageDownloader  extends mahabhuta.Munger {
@@ -128,6 +149,7 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
                 $img.attr('data-orig-src', src);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalImageDownloader for URL ${src}: ${e.stack}`);
+                $img.attr('src', src);
             }
         }
         return "ok";
@@ -150,6 +172,7 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
                 $link.attr('data-orig-href', href);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalStylesheetDownloader for URL ${href}: ${e.stack}`);
+                $link.attr('href', href);
             }
         }
     }
@@ -169,6 +192,7 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
                 $script.attr('data-orig-src', src);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalJavaScriptDownloader for URL ${src}: ${e.stack}`);
+                $script.attr('src', src);
             }
         }
         return "ok";
