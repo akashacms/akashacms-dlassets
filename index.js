@@ -69,7 +69,7 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     // of a URL.  Cheerio doesn't do the right thing to encode this
     // string correctly.  What we'll do instead is hide characters that are
     // known to be dangerous, using this rewriting technique.
-    var dlPath = path.join('___dlassets',
+    var dlPath = path.join('/___dlassets',
         // Obfuscate the host name a bit
         uHref.host ? uHref.host.replace('.', '_').replace('.', '_') : "unknown-host",
         uHref.path.replace('%', '__'));
