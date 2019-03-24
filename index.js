@@ -39,7 +39,7 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
     configure(config, options) {
         this._config = config;
         this.options = !options ? {} : options;
-        console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
+        // console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
         // config.addPartialsDir(path.join(__dirname, 'partials'));
         // config.addAssetsDir(path.join(__dirname, 'assets'));
         config.addMahabhuta(module.exports.mahabhuta);
