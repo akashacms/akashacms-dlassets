@@ -30,6 +30,8 @@ const mahabhuta = akasha.mahabhuta;
 
 const pluginName = "akashacms-dlassets";
 
+const _plugin_config = Symbol('config');
+const _plugin_options = Symbol('options');
 
 module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 	constructor() {
@@ -37,27 +39,36 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 	}
 
     configure(config, options) {
-        this._config = config;
-        this.options = !options ? {} : options;
+        this[_plugin_config] = config;
+        this[_plugin_options] = options;
+        options.config = config;
         // console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
         // config.addPartialsDir(path.join(__dirname, 'partials'));
         // config.addAssetsDir(path.join(__dirname, 'assets'));
-        config.addMahabhuta(module.exports.mahabhuta);
+        config.addMahabhuta(module.exports.mahabhutaArray(options));
     }
+
+    get config() { return this[_plugin_config]; }
+    get options() { return this[_plugin_options]; }
+
 }
 
-module.exports.mahabhuta = new mahabhuta.MahafuncArray(pluginName, {});
+module.exports.mahabhutaArray = function(options) {
+    let ret = new mahabhuta.MahafuncArray(pluginName, options);
+    ret.addMahafunc(new ExternalImageDownloader());
+    ret.addMahafunc(new ExternalStylesheetDownloader());
+    ret.addMahafunc(new ExternalJavaScriptDownloader());
+    return ret;
+};
 
 const hrefsDownloaded = new Map();
 
-async function downloadAsset(metadata, href, uHref, outputMode) {
+async function downloadAsset(config, options, href, uHref, outputMode) {
 
     if (hrefsDownloaded.has(href)) {
         // console.log(`downloadAsset cache-hit ${href}`);
         return hrefsDownloaded.get(href);
     }
-
-    const thisPlugin = metadata.config.plugin(pluginName);
 
     // Set up the path for the image.
     // We'll write this path into the <img> tag.
@@ -77,9 +88,9 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
     let pathWriteTo;
     let pathRenderTo;
 
-    if (thisPlugin.options && thisPlugin.options.cachedir) {
-        pathWriteTo = path.join(thisPlugin.options.cachedir, dlPath);
-        pathRenderTo = path.join(metadata.config.renderDestination, dlPath);
+    if (options && options.cachedir) {
+        pathWriteTo = path.join(options.cachedir, dlPath);
+        pathRenderTo = path.join(config.renderDestination, dlPath);
         // console.log(`downloadAsset cachedir ${thisPlugin.options.cachedir} pathWriteTo ${pathWriteTo} pathRenderTo ${pathRenderTo}`);
         if (await fs.pathExists(pathWriteTo)) {
             let stats = await fs.stat(pathWriteTo);
@@ -95,7 +106,7 @@ async function downloadAsset(metadata, href, uHref, outputMode) {
             } */
         }
     } else {
-        pathWriteTo = pathRenderTo = path.join(metadata.config.renderDestination, dlPath);
+        pathWriteTo = pathRenderTo = path.join(config.renderDestination, dlPath);
         // console.log(`downloadAsset NO cachedir pathWriteTo ${pathWriteTo}`);
     }
 
@@ -144,7 +155,8 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
         }
         if (uHref.protocol || uHref.slashes || uHref.host) {
             try {
-                const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'binary');
+                const { dlPath, pathWriteTo } = await downloadAsset(
+                        this.array.options.config, this.array.options, src, uHref, 'binary');
                 $img.attr('src', dlPath);
                 $img.attr('data-orig-src', src);
             } catch (e) {
@@ -155,7 +167,6 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
         return "ok";
     }
 }
-module.exports.mahabhuta.addMahafunc(new ExternalImageDownloader());
 
 class ExternalStylesheetDownloader  extends mahabhuta.Munger {
     get selector() { return 'html head link'; }
@@ -167,7 +178,8 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
         const uHref = url.parse(href, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
             try {
-                const { dlPath, pathWriteTo } = await downloadAsset(metadata, href, uHref, 'utf8');
+                const { dlPath, pathWriteTo } = await downloadAsset(
+                    this.array.options.config, this.array.options, href, uHref, 'utf8');
                 $link.attr('href', dlPath);
                 $link.attr('data-orig-href', href);
             } catch (e) {
@@ -177,7 +189,6 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
         }
     }
 }
-module.exports.mahabhuta.addMahafunc(new ExternalStylesheetDownloader());
 
 class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
     get selector() { return 'html head script'; }
@@ -187,7 +198,8 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
         const uHref = url.parse(src, true, true);
         if (uHref.protocol || uHref.slashes || uHref.host) {
             try {
-                const { dlPath, pathWriteTo } = await downloadAsset(metadata, src, uHref, 'utf8');
+                const { dlPath, pathWriteTo } = await downloadAsset(
+                    this.array.options.config, this.array.options, src, uHref, 'utf8');
                 $script.attr('src', dlPath);
                 $script.attr('data-orig-src', src);
             } catch (e) {
@@ -198,4 +210,3 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
         return "ok";
     }
 }
-module.exports.mahabhuta.addMahafunc(new ExternalJavaScriptDownloader());
