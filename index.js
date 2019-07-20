@@ -130,7 +130,7 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
         });
     });
 
-    // console.log(`downloadAsset writeFile ${dlPath} => ${pathWriteTo}`);
+    // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
     await fs.writeFile(pathWriteTo, res.body, outputMode);
     if (pathWriteTo !== pathRenderTo) {
         await fs.ensureDir(path.dirname(pathRenderTo));
@@ -143,6 +143,8 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
     return ret;
 }
 
+var imgnum = 0;
+
 class ExternalImageDownloader  extends mahabhuta.Munger {
     get selector() { return 'html body img'; }
     async process($, $img, metadata, dirty) {
@@ -152,6 +154,15 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
         if (uHref.host && uHref.host === 'www.google.com' && uHref.path.startsWith('/s2/favicons')) {
             // Special case, do not download favicons from Google's favicon service
             return "ok";
+        }
+        if (uHref.host
+         && uHref.host === 'www.plantuml.com'
+         && uHref.path.startsWith('/plantuml')) {
+            let ext;
+            if (uHref.path.startsWith('/plantuml/svg')) ext = 'svg';
+            else if (uHref.path.startsWith('/plantuml/png')) ext = 'png';
+            else throw new Error(`Unknown plantuml image type in ${src}`);
+            uHref.path = `/image${imgnum++}.${ext}`;
         }
         if (uHref.protocol || uHref.slashes || uHref.host) {
             try {
