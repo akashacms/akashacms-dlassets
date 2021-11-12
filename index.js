@@ -150,7 +150,12 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
     async process($, $img, metadata, dirty) {
         const src   = $img.attr('src');
         if (!src) return "ok";
-        if ($img.prop('nodownload')) return "ok";
+
+        // There are various reasons to not download images.  For any
+        // such instance, we simply return rather than proceeding with
+        // calling downloadAsset
+
+        if (typeof $img.prop('nodownload') !== 'undefined') return "ok";
         const uHref = url.parse(src, true, true);
         if (uHref.host && uHref.host === 'www.google.com' && uHref.path.startsWith('/s2/favicons')) {
             // Special case, do not download favicons from Google's favicon service
