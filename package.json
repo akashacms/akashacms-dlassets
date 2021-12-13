@@ -4,12 +4,14 @@
   "description": "Automatically download assets referenced in links, images, etc",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "David Herron <david@davidherron.com>",
+  "engines": {
+    "node": ">=14.8"
+  },
   "license": "ISC",
   "dependencies": {
-    "request": ">=2.85.0",
-    "fs-extra": ">=5.0.0"
+    "fs-extra": ">=5.0.0",
+    "node-fetch": "^3.1.x"
   }
 }

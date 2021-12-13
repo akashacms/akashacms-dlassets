@@ -24,6 +24,18 @@ const url      = require('url');
 const request  = require('request');
 // const got      = require('got');
 // const FetchStream = require("fetch").FetchStream;
+
+// node-fetch only supports use from ESM modules
+// We can use import() to load the module but that
+// requires dealing with the Promise returned by import
+const fetch = (...args) => import('node-fetch')
+            .then(({default: fetch}) => fetch(...args));
+
+// stream.pipeline is used for saving to disk
+// But it is a callbacks function, so we use util.promisify
+const stream   = require('stream');
+const dopipeline = util.promisify(stream.pipeline);
+
 const fs       = require("fs-extra");
 const akasha   = require('akasharender');
 const mahabhuta = akasha.mahabhuta;
@@ -80,10 +92,16 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
     // of a URL.  Cheerio doesn't do the right thing to encode this
     // string correctly.  What we'll do instead is hide characters that are
     // known to be dangerous, using this rewriting technique.
-    var dlPath = path.join('/___dlassets',
-        // Obfuscate the host name a bit
-        uHref.host ? uHref.host.replace('.', '_').replace('.', '_') : "unknown-host",
-        uHref.path.replace('%', '__'));
+
+    // console.log(`downloadAsset downloading '${uHref.host}' '${uHref.path}'`);
+
+    const dlpath_host = uHref.host
+            ? uHref.host.replace('.', '_').replace('.', '_')
+            : "unknown-host";
+    // TODO - Instead of this, generate a hash of the path
+    const dlpath_path = uHref.path.replace('%', '__');
+
+    const dlPath = path.join('/___dlassets', dlpath_host, dlpath_path);;
 
     let pathWriteTo;
     let pathRenderTo;
@@ -120,18 +138,13 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
 
     await fs.ensureDir(path.dirname(pathWriteTo));
 
-    var res = await new Promise((resolve, reject) => {
-        request({ 
-            url: href,
-            encoding: outputMode === 'binary' ? null : 'utf8'
-        }, (error, response, body) => {
-            if (error) reject(error);
-            else resolve({response, body});
-        });
-    });
+    const response = await fetch(href);
+    if (!response.ok) {
+        throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
+    }
+    await dopipeline(response.body, fs.createWriteStream(pathWriteTo));
 
     // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
-    await fs.writeFile(pathWriteTo, res.body, outputMode);
     if (pathWriteTo !== pathRenderTo) {
         await fs.ensureDir(path.dirname(pathRenderTo));
         // console.log(`downloadAsset copy ${dlPath} => ${pathRenderTo}`);
