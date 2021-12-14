@@ -240,6 +240,7 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
                         this.array.options.config, this.array.options, src, uHref, 'binary');
                 $img.attr('src', dlPath);
                 $img.attr('data-orig-src', src);
+                // console.log(`ExternalImageDownloader ${src} ==> ${dlPath}`);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalImageDownloader for URL ${src}: ${e.stack}`);
                 $img.attr('src', src);
@@ -263,6 +264,7 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
                     this.array.options.config, this.array.options, href, uHref, 'utf8');
                 $link.attr('href', dlPath);
                 $link.attr('data-orig-href', href);
+                // console.log(`ExternalStylesheetDownloader ${src} ==> ${dlPath}`);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalStylesheetDownloader for URL ${href}: ${e.stack}`);
                 $link.attr('href', href);
@@ -283,6 +285,7 @@ class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
                     this.array.options.config, this.array.options, src, uHref, 'utf8');
                 $script.attr('src', dlPath);
                 $script.attr('data-orig-src', src);
+                // console.log(`ExternalJavaScriptDownloader ${src} ==> ${dlPath}`);
             } catch (e) {
                 console.log(`IGNORE ERROR akashacms-dlassets ExternalJavaScriptDownloader for URL ${src}: ${e.stack}`);
                 $script.attr('src', src);
