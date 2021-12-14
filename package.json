@@ -1,5 +1,5 @@
 {
-  "name": "akashacms-dlassets",
+  "name": "@akashacms/plugin-dlassets",
   "version": "0.7.0",
   "description": "Automatically download assets referenced in links, images, etc",
   "main": "index.js",

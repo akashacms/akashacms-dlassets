@@ -43,7 +43,7 @@ const bs58     = require('bs58');
 const akasha   = require('akasharender');
 const mahabhuta = akasha.mahabhuta;
 
-const pluginName = "akashacms-dlassets";
+const pluginName = "@akashacms/plugin-dlassets";
 
 const _plugin_config = Symbol('config');
 const _plugin_options = Symbol('options');
