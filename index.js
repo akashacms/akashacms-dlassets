@@ -21,13 +21,14 @@
 const path     = require('path');
 const util     = require('util');
 const url      = require('url');
-const request  = require('request');
-// const got      = require('got');
-// const FetchStream = require("fetch").FetchStream;
+const fsp      = require('fs/promises');
+const fs       = require('fs');
 
-// node-fetch only supports use from ESM modules
+// node-fetch only supports use from ESM modules.
 // We can use import() to load the module but that
-// requires dealing with the Promise returned by import
+// requires dealing with the Promise returned by import,
+// This construct is what the project suggests for
+// use from a CommonJS module.
 const fetch = (...args) => import('node-fetch')
             .then(({default: fetch}) => fetch(...args));
 
@@ -36,7 +37,9 @@ const fetch = (...args) => import('node-fetch')
 const stream   = require('stream');
 const dopipeline = util.promisify(stream.pipeline);
 
-const fs       = require("fs-extra");
+const mime     = require('mime');
+const bs58     = require('bs58');
+
 const akasha   = require('akasharender');
 const mahabhuta = akasha.mahabhuta;
 
@@ -111,40 +114,45 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
 
     // console.log(`downloadAsset downloading '${uHref.host}' '${uHref.path}'`);
 
+    // The file name to construct is:
+    //
+    //    /__dlassets/host_name/ENCODED-FN.ext
+    //
+    // The host_name is the host from the href, with some characters
+    // changed to make it safer as a file name
+    //
+    // The ENCODED-FN is because for some URLs the path string
+    // is very complex and decidedly not safe as a file name.
+    // What we want to do is concatenate every portion of
+    // the parsed URL which is the path, namely the path,
+    // the search string, and the hash string.  That full path
+    // is then encoded in BASE58, which is safe for use
+    // in the file system.
+
     const dlpath_host = uHref.host
             ? uHref.host.replace('.', '_').replace('.', '_')
             : "unknown-host";
-    // TODO - Instead of this, generate a hash of the path
-    const dlpath_path = uHref.path.replace('%', '__');
 
-    const dlPath = path.join('/___dlassets', dlpath_host, dlpath_path);;
+    // Construct the full path string, then encode it as a string
+    // which is safe to be used as a file name
+    const fullpath = uHref.path + uHref.search + uHref.hash;
+    const fnbytes = Buffer.from(fullpath);
+    const bs58fn  = bs58.encode(fnbytes);
 
-    let pathWriteTo;
-    let pathRenderTo;
+    const dlDir  = path.join('/___dlassets', dlpath_host);
 
+    let dirWriteTo;
+    let dirRenderTo;
     if (options && options.cachedir) {
-        pathWriteTo = path.join(options.cachedir, dlPath);
-        pathRenderTo = path.join(config.renderDestination, dlPath);
-        // console.log(`downloadAsset cachedir ${thisPlugin.options.cachedir} pathWriteTo ${pathWriteTo} pathRenderTo ${pathRenderTo}`);
-        if (await fs.pathExists(pathWriteTo)) {
-            let stats = await fs.stat(pathWriteTo);
-            let age = (new Date() - stats.mtime) / 1000;
-            let seven_days = (7 * 24 * 60 * 60);
-            if (age < seven_days) { // younger than 7 days
-                let ret = { dlPath, pathRenderTo };
-                hrefsDownloaded.set(href, ret);
-                // console.log(`downloadAsset found ${dlPath} => ${pathRenderTo}`);
-                return ret;
-            } /* else {
-                console.log(`downloadAsset age ${dlPath} => ${pathWriteTo} too old ${age} seven_days ${seven_days}`);
-            } */
-        }
+        dirWriteTo = path.join(options.cachedir, dlDir);
+        dirRenderTo = path.join(config.renderDestination, dlDir);
     } else {
-        pathWriteTo = pathRenderTo = path.join(config.renderDestination, dlPath);
+        dirWriteTo = dirRenderTo = path.join(config.renderDestination, dlDir);
         // console.log(`downloadAsset NO cachedir pathWriteTo ${pathWriteTo}`);
     }
 
-    // var pathWriteTo = path.join(metadata.config.renderDestination, dlPath);
+    let pathWriteTo;
+    let pathRenderTo;
 
     if (!uHref.protocol) {
         uHref.protocol = 'http';
@@ -152,17 +160,29 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
         // console.log(`downloadAsset NO PROTOCOL change href to ${href} ${util.inspect(uHref)}`);
     }
 
-    await fs.ensureDir(path.dirname(pathWriteTo));
+    // console.log(`downloadAsset dlDir ${dlDir} dlpath_host ${dlpath_host} dirWriteTo ${dirWriteTo} dirRenderTo ${dirRenderTo}`);
+    await fsp.mkdir(dirWriteTo, { recursive: true });
+    await fsp.mkdir(dirRenderTo, { recursive: true });
+
+    // Start the download here
+    //
+    // The response object contains the Content-Type from which we get
+    // the file name extension to use.
+    //
+    // The download is finished further down with dopipeline
 
     const response = await fetch(href);
     if (!response.ok) {
         throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
     }
 
-    // This lets us see the details of the data structure 
-    // returned by fetch
+    const dlFN = bs58fn
+            +'.'+ mime.getExtension(response.headers.get('content-type'));
+    const dlPath = path.join(dlDir, dlFN);
+    pathWriteTo = path.join(dirWriteTo, dlFN);
+    pathRenderTo = path.join(dirRenderTo, dlFN);
 
-    /* console.log(`downloadAsset ${href} `, {
+    /* console.log(`downloadAsset ${href} dlDir ${dlDir} dlPath ${dlPath} `, {
         ok: response.ok,
         status: response.status,
         statusText: response.statusText,
@@ -170,13 +190,14 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
         contentType: response.headers.get('content-type')
     }); */
 
+    // Finish the download
     await dopipeline(response.body, fs.createWriteStream(pathWriteTo));
 
     // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
     if (pathWriteTo !== pathRenderTo) {
-        await fs.ensureDir(path.dirname(pathRenderTo));
+        await fsp.mkdir(path.dirname(pathRenderTo), { recursive: true });
         // console.log(`downloadAsset copy ${dlPath} => ${pathRenderTo}`);
-        await fs.copy(pathWriteTo, pathRenderTo);
+        await fsp.copyFile(pathWriteTo, pathRenderTo);
     }
 
     let ret = { dlPath, pathRenderTo };
@@ -198,7 +219,9 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
 
         if (typeof $img.prop('nodownload') !== 'undefined') return "ok";
         const uHref = url.parse(src, true, true);
-        if (uHref.host && uHref.host === 'www.google.com' && uHref.path.startsWith('/s2/favicons')) {
+        if (uHref.host
+         && uHref.host === 'www.google.com'
+         && uHref.path.startsWith('/s2/favicons')) {
             // Special case, do not download favicons from Google's favicon service
             return "ok";
         }
