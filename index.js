@@ -75,6 +75,22 @@ module.exports.mahabhutaArray = function(options) {
 
 const hrefsDownloaded = new Map();
 
+// TODO
+//
+// Handle outputMode binary vs utf8
+//
+// Reorganize into this process
+//
+//    1. compute dlDir = path.join('/___dlassets', dlpath_host)
+//    2. ensure that directory exists
+//    3. start fetch
+//    4. Throw error if it fails
+//    5. Hash uHref.path making sure it is a legit pathname
+//    6. Depending on response.headers.get('content-type)
+//       append a file extension to the encoded path
+//    7. compute dlPath = path.join(dlDir, encoded-path-and-extension)
+//    8. stream response.body to that file ensuring it is in correct mode
+
 async function downloadAsset(config, options, href, uHref, outputMode) {
 
     if (hrefsDownloaded.has(href)) {
@@ -142,6 +158,18 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
     if (!response.ok) {
         throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
     }
+
+    // This lets us see the details of the data structure 
+    // returned by fetch
+
+    /* console.log(`downloadAsset ${href} `, {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers.raw(),
+        contentType: response.headers.get('content-type')
+    }); */
+
     await dopipeline(response.body, fs.createWriteStream(pathWriteTo));
 
     // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
