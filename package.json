@@ -1,9 +1,25 @@
 {
-  "name": "@akashacms/plugin-dlassets",
-  "version": "0.7.0",
+  "name": "@akashacms/plugins-dlassets",
+  "version": "0.8.0",
   "description": "Automatically download assets referenced in links, images, etc",
+  "keywords": [
+    "content management system",
+    "cms",
+    "static site generator",
+    "static file server",
+    "web development",
+    "build and deployment",
+    "renderer",
+    "templating",
+    "templates",
+    "website",
+    "website builder",
+    "blog",
+    "akashacms"
+  ],
   "main": "index.js",
   "scripts": {
+    "dopublish": "npm publish --access public"
   },
   "author": "David Herron <david@davidherron.com>",
   "engines": {

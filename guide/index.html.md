@@ -14,7 +14,7 @@ With an AkashaCMS website setup, add the following to `package.json`
 ```json
   "dependencies": {
     ...
-    "@akashacms/plugin-dlassets": "akashacms/akashacms-dlassets",
+    "@akashacms/plugins-dlassets": "@akashacms/plugins-dlassets",
     ...
   }
 ```
@@ -28,7 +28,7 @@ Once added to `package.json` run: `npm install`
 In `config.js` for the website:
 
 ```js
-config.use(require('@akashacms/plugin-dlassets'), {
+config.use(require('@akashacms/plugins-dlassets'), {
     // optional options
 });
 ```
