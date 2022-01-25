@@ -14,12 +14,10 @@ With an AkashaCMS website setup, add the following to `package.json`
 ```json
   "dependencies": {
     ...
-    "@akashacms/plugins-dlassets": "@akashacms/plugins-dlassets",
+    "@akashacms/plugins-dlassets": "0.8.x",
     ...
   }
 ```
-
-Note, at this time, this plugin is not being published to npm, and instead is retrieved directly from the GitHub repository.
 
 Once added to `package.json` run: `npm install`
 
