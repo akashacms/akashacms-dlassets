@@ -176,7 +176,7 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
         throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
     }
 
-    const dlFN = bs58fn
+    const dlFN = bs58fn.substring(0, 60)
             +'.'+ mime.getExtension(response.headers.get('content-type'));
     const dlPath = path.join(dlDir, dlFN);
     pathWriteTo = path.join(dirWriteTo, dlFN);
