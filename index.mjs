@@ -18,37 +18,32 @@
  */
 
 
-const path     = require('path');
-const util     = require('util');
-const url      = require('url');
-const fsp      = require('fs/promises');
-const fs       = require('fs');
+import path from 'node:path';
+import util from 'node:util';
+import url from 'node:url';
+import fs, { promises as fsp } from 'node:fs';
 
-// node-fetch only supports use from ESM modules.
-// We can use import() to load the module but that
-// requires dealing with the Promise returned by import,
-// This construct is what the project suggests for
-// use from a CommonJS module.
-const fetch = (...args) => import('node-fetch')
-            .then(({default: fetch}) => fetch(...args));
+import fetch from 'node-fetch';
 
 // stream.pipeline is used for saving to disk
 // But it is a callbacks function, so we use util.promisify
-const stream   = require('stream');
+import stream from 'node:stream';
 const dopipeline = util.promisify(stream.pipeline);
 
-const mime     = require('mime');
-const bs58     = require('bs58');
+import mime from 'mime';
+import bs58 from 'bs58';
 
-const akasha   = require('akasharender');
+import akasha from 'akasharender';
 const mahabhuta = akasha.mahabhuta;
+
+const __dirname = import.meta.dirname;
 
 const pluginName = "@akashacms/plugins-dlassets";
 
 const _plugin_config = Symbol('config');
 const _plugin_options = Symbol('options');
 
-module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
+export class DownloadAssetsPlugin extends akasha.Plugin {
 	constructor() {
 		super(pluginName);
 	}
@@ -60,7 +55,7 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
         // console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
         // config.addPartialsDir(path.join(__dirname, 'partials'));
         // config.addAssetsDir(path.join(__dirname, 'assets'));
-        config.addMahabhuta(module.exports.mahabhutaArray(options));
+        config.addMahabhuta(mahabhutaArray(options));
     }
 
     get config() { return this[_plugin_config]; }
@@ -68,7 +63,7 @@ module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
 
 }
 
-module.exports.mahabhutaArray = function(options) {
+export function mahabhutaArray(options) {
     let ret = new mahabhuta.MahafuncArray(pluginName, options);
     ret.addMahafunc(new ExternalImageDownloader());
     ret.addMahafunc(new ExternalStylesheetDownloader());
