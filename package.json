@@ -28,8 +28,8 @@
   },
   "license": "ISC",
   "dependencies": {
-    "node-fetch": "3.3.x",
-    "mime": "^4.0.x",
-    "bs58": "^6.0.x"
+    "bs58": "^6.0.x",
+    "got": "^14.4.7",
+    "mime": "^4.0.x"
   }
 }

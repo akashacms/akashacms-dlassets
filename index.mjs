@@ -17,18 +17,12 @@
  *  limitations under the License.
  */
 
-
 import path from 'node:path';
 import util from 'node:util';
 import url from 'node:url';
 import fs, { promises as fsp } from 'node:fs';
 
-import fetch from 'node-fetch';
-
-// stream.pipeline is used for saving to disk
-// But it is a callbacks function, so we use util.promisify
-import stream from 'node:stream';
-const dopipeline = util.promisify(stream.pipeline);
+import got from 'got';
 
 import mime from 'mime';
 import bs58 from 'bs58';
@@ -163,30 +157,51 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
     //
     // The response object contains the Content-Type from which we get
     // the file name extension to use.
-    //
-    // The download is finished further down with dopipeline
 
-    const response = await fetch(href);
-    if (!response.ok) {
-        throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
+    const promise = got.get(href, {
+        responseType: 'buffer',
+        followRedirect: true
+    });
+    const response = await promise;
+    if (!(
+        response.complete
+     && response.statusCode === 200
+     && response.statusMessage === 'OK'
+    )) {
+        throw new Error(`downloadAsset FAIL ${response.statusMessage} for ${href} ${util.inspect({   
+            ok: response.ok,
+            complete: response.complete,
+            statusCode: response.statusCode,
+            status: response.status,
+            statusMessage: response.statusMessage,
+            headers: response.headers,
+            contentType: response.headers['content-type'],
+            url: response.url
+        })}`);
     }
 
     const dlFN = bs58fn.substring(0, 60)
-            +'.'+ mime.getExtension(response.headers.get('content-type'));
+            +'.'+ mime.getExtension(response.headers['content-type']);
     const dlPath = path.join(dlDir, dlFN);
     pathWriteTo = path.join(dirWriteTo, dlFN);
     pathRenderTo = path.join(dirRenderTo, dlFN);
 
     /* console.log(`downloadAsset ${href} dlDir ${dlDir} dlPath ${dlPath} `, {
         ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers.raw(),
-        contentType: response.headers.get('content-type')
+        complete: response.complete,
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        url: response.url,
+        headers: response.headers,
+        contentType: response.headers['content-type'],
     }); */
 
-    // Finish the download
-    await dopipeline(response.body, fs.createWriteStream(pathWriteTo));
+    await fsp.writeFile(pathWriteTo, await promise.buffer());
+
+    // I tried writing all this by doing a stream from Got
+    // to a fs.createWriteStream but that didn't work.  This
+    // solution of bringing the response into a Buffer etc is
+    // less than ideal because of memory use.
 
     // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
     if (pathWriteTo !== pathRenderTo) {
