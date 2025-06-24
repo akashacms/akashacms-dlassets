@@ -1,6 +1,6 @@
 /**
  *
- * Copyright 2018, 2019 David Herron
+ * Copyright 2018-2025 David Herron
  *
  * This file is part of AkashaCMS-dlassets (http://akashacms.com/).
  *
@@ -17,62 +17,61 @@
  *  limitations under the License.
  */
 
+import path from 'node:path';
+import util from 'node:util';
+import url from 'node:url';
+import fs, { promises as fsp } from 'node:fs';
 
-const path     = require('path');
-const util     = require('util');
-const url      = require('url');
-const fsp      = require('fs/promises');
-const fs       = require('fs');
+import got from 'got';
 
-// node-fetch only supports use from ESM modules.
-// We can use import() to load the module but that
-// requires dealing with the Promise returned by import,
-// This construct is what the project suggests for
-// use from a CommonJS module.
-const fetch = (...args) => import('node-fetch')
-            .then(({default: fetch}) => fetch(...args));
+import mime from 'mime';
+import bs58 from 'bs58';
 
-// stream.pipeline is used for saving to disk
-// But it is a callbacks function, so we use util.promisify
-const stream   = require('stream');
-const dopipeline = util.promisify(stream.pipeline);
-
-const mime     = require('mime');
-const bs58     = require('bs58');
-
-const akasha   = require('akasharender');
+import akasha, {
+    Configuration,
+    CustomElement,
+    Munger,
+    PageProcessor
+} from 'akasharender';
 const mahabhuta = akasha.mahabhuta;
+
+const __dirname = import.meta.dirname;
 
 const pluginName = "@akashacms/plugins-dlassets";
 
-const _plugin_config = Symbol('config');
-const _plugin_options = Symbol('options');
-
-module.exports = class DownloadAssetsPlugin extends akasha.Plugin {
+export class DownloadAssetsPlugin extends akasha.Plugin {
 	constructor() {
 		super(pluginName);
 	}
 
+    #config;
+
     configure(config, options) {
-        this[_plugin_config] = config;
-        this[_plugin_options] = options;
-        options.config = config;
+        this.#config = config;
+        // this.config = config;
+        this.akasha = config.akasha;
+        this.options = options ? options : {};
+        this.options.config = config;
         // console.log(`${pluginName} options ${util.inspect(options)} this.options ${util.inspect(this.options)}`);
         // config.addPartialsDir(path.join(__dirname, 'partials'));
         // config.addAssetsDir(path.join(__dirname, 'assets'));
-        config.addMahabhuta(module.exports.mahabhutaArray(options));
+        config.addMahabhuta(mahabhutaArray(options, config, this.akasha, this));
     }
 
-    get config() { return this[_plugin_config]; }
-    get options() { return this[_plugin_options]; }
+    get config() { return this.#config; }
 
 }
 
-module.exports.mahabhutaArray = function(options) {
+export function mahabhutaArray(
+    options,
+    config, // ?: Configuration,
+    akasha, // ?: any,
+    plugin  // ?: Plugin
+) {
     let ret = new mahabhuta.MahafuncArray(pluginName, options);
-    ret.addMahafunc(new ExternalImageDownloader());
-    ret.addMahafunc(new ExternalStylesheetDownloader());
-    ret.addMahafunc(new ExternalJavaScriptDownloader());
+    ret.addMahafunc(new ExternalImageDownloader(config, akasha, plugin));
+    ret.addMahafunc(new ExternalStylesheetDownloader(config, akasha, plugin));
+    ret.addMahafunc(new ExternalJavaScriptDownloader(config, akasha, plugin));
     return ret;
 };
 
@@ -135,7 +134,7 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
 
     // Construct the full path string, then encode it as a string
     // which is safe to be used as a file name
-    const fullpath = uHref.path + uHref.search + uHref.hash;
+    const fullpath = uHref.pathname + uHref.search + uHref.hash;
     const fnbytes = Buffer.from(fullpath);
     const bs58fn  = bs58.encode(fnbytes);
 
@@ -156,7 +155,7 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
 
     if (!uHref.protocol) {
         uHref.protocol = 'http';
-        href = url.format(uHref);
+        href = uHref.toString(); //  url.format(uHref);
         // console.log(`downloadAsset NO PROTOCOL change href to ${href} ${util.inspect(uHref)}`);
     }
 
@@ -168,30 +167,51 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
     //
     // The response object contains the Content-Type from which we get
     // the file name extension to use.
-    //
-    // The download is finished further down with dopipeline
 
-    const response = await fetch(href);
-    if (!response.ok) {
-        throw new Error(`downloadAsset FAIL ${response.statusText} for ${href}`);
+    const promise = got.get(href, {
+        responseType: 'buffer',
+        followRedirect: true
+    });
+    const response = await promise;
+    if (!(
+        response.complete
+     && response.statusCode === 200
+     && response.statusMessage === 'OK'
+    )) {
+        throw new Error(`downloadAsset FAIL ${response.statusMessage} for ${href} ${util.inspect({   
+            ok: response.ok,
+            complete: response.complete,
+            statusCode: response.statusCode,
+            status: response.status,
+            statusMessage: response.statusMessage,
+            headers: response.headers,
+            contentType: response.headers['content-type'],
+            url: response.url
+        })}`);
     }
 
     const dlFN = bs58fn.substring(0, 60)
-            +'.'+ mime.getExtension(response.headers.get('content-type'));
+            +'.'+ mime.getExtension(response.headers['content-type']);
     const dlPath = path.join(dlDir, dlFN);
     pathWriteTo = path.join(dirWriteTo, dlFN);
     pathRenderTo = path.join(dirRenderTo, dlFN);
 
     /* console.log(`downloadAsset ${href} dlDir ${dlDir} dlPath ${dlPath} `, {
         ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers.raw(),
-        contentType: response.headers.get('content-type')
+        complete: response.complete,
+        statusCode: response.statusCode,
+        statusMessage: response.statusMessage,
+        url: response.url,
+        headers: response.headers,
+        contentType: response.headers['content-type'],
     }); */
 
-    // Finish the download
-    await dopipeline(response.body, fs.createWriteStream(pathWriteTo));
+    await fsp.writeFile(pathWriteTo, await promise.buffer());
+
+    // I tried writing all this by doing a stream from Got
+    // to a fs.createWriteStream but that didn't work.  This
+    // solution of bringing the response into a Buffer etc is
+    // less than ideal because of memory use.
 
     // console.log(`downloadAsset ${href} writeFile ${dlPath} => ${pathWriteTo}`);
     if (pathWriteTo !== pathRenderTo) {
@@ -207,7 +227,7 @@ async function downloadAsset(config, options, href, uHref, outputMode) {
 
 var imgnum = 0;
 
-class ExternalImageDownloader  extends mahabhuta.Munger {
+class ExternalImageDownloader  extends Munger {
     get selector() { return 'html body img'; }
     async process($, $img, metadata, dirty) {
         const src   = $img.attr('src');
@@ -218,26 +238,27 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
         // calling downloadAsset
 
         if (typeof $img.prop('nodownload') !== 'undefined') return "ok";
-        const uHref = url.parse(src, true, true);
+        const uHref = new URL(src, 'http://example.com');
         if (uHref.host
          && uHref.host === 'www.google.com'
-         && uHref.path.startsWith('/s2/favicons')) {
+         && uHref.pathname.startsWith('/s2/favicons')) {
             // Special case, do not download favicons from Google's favicon service
             return "ok";
         }
         if (uHref.host
          && uHref.host === 'www.plantuml.com'
-         && uHref.path.startsWith('/plantuml')) {
+         && uHref.pathname.startsWith('/plantuml')) {
             let ext;
-            if (uHref.path.startsWith('/plantuml/svg')) ext = 'svg';
-            else if (uHref.path.startsWith('/plantuml/png')) ext = 'png';
+            if (uHref.pathname.startsWith('/plantuml/svg')) ext = 'svg';
+            else if (uHref.pathname.startsWith('/plantuml/png')) ext = 'png';
             else throw new Error(`Unknown plantuml image type in ${src}`);
-            uHref.path = `/image${imgnum++}.${ext}`;
+            uHref.pathname = `/image${imgnum++}.${ext}`;
         }
-        if (uHref.protocol || uHref.slashes || uHref.host) {
+        if (uHref.origin !== 'http://example.com' ) {
+            // Not a Local URL
             try {
                 const { dlPath, pathWriteTo } = await downloadAsset(
-                        this.array.options.config, this.array.options, src, uHref, 'binary');
+                        this.config, this.options, src, uHref, 'binary');
                 $img.attr('src', dlPath);
                 $img.attr('data-orig-src', src);
                 // console.log(`ExternalImageDownloader ${src} ==> ${dlPath}`);
@@ -250,18 +271,18 @@ class ExternalImageDownloader  extends mahabhuta.Munger {
     }
 }
 
-class ExternalStylesheetDownloader  extends mahabhuta.Munger {
+class ExternalStylesheetDownloader  extends Munger {
     get selector() { return 'html head link'; }
     async process($, $link, metadata, dirty) {
         const type   = $link.attr('type');
         const href   = $link.attr('href');
         if (!href) return "ok";
         if (type !== 'text/css') return "ok";
-        const uHref = url.parse(href, true, true);
-        if (uHref.protocol || uHref.slashes || uHref.host) {
+        const uHref = new URL(href, 'http://example.com');
+        if (uHref.origin !== 'http://example.com') {
             try {
                 const { dlPath, pathWriteTo } = await downloadAsset(
-                    this.array.options.config, this.array.options, href, uHref, 'utf8');
+                    this.config, this.options, href, uHref, 'utf8');
                 $link.attr('href', dlPath);
                 $link.attr('data-orig-href', href);
                 // console.log(`ExternalStylesheetDownloader ${src} ==> ${dlPath}`);
@@ -273,16 +294,16 @@ class ExternalStylesheetDownloader  extends mahabhuta.Munger {
     }
 }
 
-class ExternalJavaScriptDownloader  extends mahabhuta.Munger {
+class ExternalJavaScriptDownloader  extends Munger {
     get selector() { return 'html head script'; }
     async process($, $script, metadata, dirty) {
         const src   = $script.attr('src');
         if (!src) return "ok";
-        const uHref = url.parse(src, true, true);
-        if (uHref.protocol || uHref.slashes || uHref.host) {
+        const uHref = new URL(src, 'http://example.com')
+        if (uHref.origin !== 'http://example.com') {
             try {
                 const { dlPath, pathWriteTo } = await downloadAsset(
-                    this.array.options.config, this.array.options, src, uHref, 'utf8');
+                    this.config, this.options, src, uHref, 'utf8');
                 $script.attr('src', dlPath);
                 $script.attr('data-orig-src', src);
                 // console.log(`ExternalJavaScriptDownloader ${src} ==> ${dlPath}`);

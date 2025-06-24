@@ -17,18 +17,19 @@
     "blog",
     "akashacms"
   ],
-  "main": "index.js",
+  "main": "index.mjs",
+  "type": "module",
   "scripts": {
     "dopublish": "npm publish --access public"
   },
   "author": "David Herron <david@davidherron.com>",
   "engines": {
-    "node": ">=14.8"
+    "node": ">=20.x"
   },
   "license": "ISC",
   "dependencies": {
-    "node-fetch": "3.2.10",
-    "mime": "^3.0.x",
-    "bs58": "^4.0.x"
+    "bs58": "^6.0.x",
+    "got": "^14.4.7",
+    "mime": "^4.0.x"
   }
 }

@@ -14,7 +14,7 @@ With an AkashaCMS website setup, add the following to `package.json`
 ```json
   "dependencies": {
     ...
-    "@akashacms/plugins-dlassets": "0.8.x",
+    "@akashacms/plugins-dlassets": "0.9.x",
     ...
   }
 ```
@@ -23,12 +23,18 @@ Once added to `package.json` run: `npm install`
 
 # Configuration
 
-In `config.js` for the website:
+In `config.mjs` for the website:
 
 ```js
-config.use(require('@akashacms/plugins-dlassets'), {
-    // optional options
-});
+import { DownloadAssetsPlugin } from '@akashacms/plugins-dlassets';
+// ...
+config
+    // ...
+    .use(DownloadAssetsPlugin, {
+      // options
+    })
+    // ...
+    ;
 ```
 
 The options argument is an optional object that can contain these fields:
