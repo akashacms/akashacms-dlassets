@@ -1,6 +1,6 @@
 {
   "name": "@akashacms/plugins-dlassets",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Automatically download assets referenced in links, images, etc",
   "keywords": [
     "content management system",
@@ -24,7 +24,7 @@
   },
   "author": "David Herron <david@davidherron.com>",
   "engines": {
-    "node": ">=20.x"
+    "node": ">=24.x"
   },
   "license": "ISC",
   "dependencies": {
